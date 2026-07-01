@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--
+ Copyright 2026 Google LLC
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+-->
+<AssignMessage continueOnError="false" enabled="true" name="AM-RedirectAuth">
+  <DisplayName>AM-RedirectAuth</DisplayName>
+  <Properties/>
+  <Set>
+    <Headers>
+      <Header name="location">
+        <![CDATA[https://auth.atlassian.com/authorize?audience=api.atlassian.com&client_id={request.queryparam.client_id}&scope={request.queryparam.scope}&redirect_uri=https%3A%2F%2F{request.header.host}%2Fatlassian-mcp%2Foauth2%2Fcallback&state={request.queryparam.state}&response_type={request.queryparam.response_type}&code_challenge={request.queryparam.code_challenge}&code_challenge_method={request.queryparam.code_challenge_method}&prompt={request.queryparam.prompt}]]>
+      </Header>
+    </Headers>
+    <StatusCode>302</StatusCode>
+  </Set>
+  <IgnoreUnresolvedVariables>true</IgnoreUnresolvedVariables>
+  <AssignTo createNew="true" transport="http" type="response"/>
+</AssignMessage>

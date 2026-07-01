@@ -1,0 +1,35 @@
+/*
+ * Copyright 2026 Google LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+try {
+    var payloadStr = context.getVariable("response.content");
+    if (payloadStr) {
+        var payload = JSON.parse(payloadStr);
+        var originalUrl = payload.authorization_servers[0];
+        var urlParts = originalUrl.split("auth.atlassian.com");
+        var suffix = "";
+        if (urlParts.length > 1) {
+            suffix = urlParts[1]; // Extracts "/VCeDsk8ZHncYF1g234fKtc4lNipbBhu3"
+        }
+        var host = context.getVariable("original_host") || context.getVariable("request.header.host");
+        payload.authorization_servers = [
+            "https://" + host + "/atlassian-mcp/oauth2" + suffix
+        ];
+        payload.resource = "https://" + host + "/atlassian-mcp/v1/mcp";
+        context.setVariable("response.content", JSON.stringify(payload));
+    }
+} catch (e) {
+    // ignore
+}
