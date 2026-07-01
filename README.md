@@ -26,10 +26,16 @@ sequenceDiagram
 
     Note over Client, Apigee: Discovery Phase (RFC 9728)
     Client->>Apigee: GET /.well-known/oauth-protected-resource/atlassian-mcp
-    Apigee-->>Client: 200 OK (Resource Metadata: OAuth server base location)
+    Apigee->>Atlassian: Forward GET to Atlassian PRM Endpoint
+    Atlassian-->>Apigee: Return Atlassian Protected Resource Metadata
+    Apigee->>Apigee: JS Policy: Rewrite resource URLs to point to Apigee
+    Apigee-->>Client: Return Mediated Protected Resource Metadata
     
     Client->>Apigee: GET /.well-known/oauth-authorization-server/atlassian-mcp
-    Apigee-->>Client: 200 OK (Authorization Server Metadata: token, auth, & DCR endpoints)
+    Apigee->>Atlassian: Forward GET to Atlassian OASM Endpoint
+    Atlassian-->>Apigee: Return Atlassian Authorization Server Metadata
+    Apigee->>Apigee: JS Policy: Rewrite auth, token, and DCR endpoints to Apigee
+    Apigee-->>Client: Return Mediated Authorization Server Metadata
 
     Note over Client, Apigee: Dynamic Client Registration (DCR)
     Client->>Apigee: POST /atlassian-mcp/v1/mcp/authv2 (Register Client Metadata)
