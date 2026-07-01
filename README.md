@@ -109,7 +109,7 @@ Cursor supports Dynamic Client Registration (DCR) for remote MCP servers.
    {
      "mcpServers": {
        "atlassian-apigee": {
-         "url": "https://workshop.iloveapi.management/atlassian-mcp/v1/mcp"
+         "url": "https://YOUR_APIGEE_HOST/atlassian-mcp/v1/mcp"
        }
      }
    }
