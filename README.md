@@ -16,7 +16,7 @@ The gateway intercepts MCP requests, dynamically manages client credentials and 
 
 The authentication flow utilizes **RFC 9728** (Protected Resource Metadata) for discovery, dynamically registers client credentials, intercepts OAuth 3LO redirects to capture codes, and proxies token exchanges back to Atlassian while caching the sessions at the edge.
 
-### Flow 1: Client Registration & Token Acquisition (SSO)
+### Flow 1: RFC 9728 Discovery, Dynamic Registration & Token Acquisition (SSO)
 ```mermaid
 sequenceDiagram
     autonumber
@@ -24,7 +24,15 @@ sequenceDiagram
     participant Apigee as Apigee Gateway
     participant Atlassian as Atlassian Cloud
 
-    Client->>Apigee: POST /atlassian-mcp/v1/mcp/authv2 (Registration)
+    Note over Client, Apigee: Discovery Phase (RFC 9728)
+    Client->>Apigee: GET /.well-known/oauth-protected-resource/atlassian-mcp
+    Apigee-->>Client: 200 OK (Resource Metadata: OAuth server base location)
+    
+    Client->>Apigee: GET /.well-known/oauth-authorization-server/atlassian-mcp
+    Apigee-->>Client: 200 OK (Authorization Server Metadata: token, auth, & DCR endpoints)
+
+    Note over Client, Apigee: Dynamic Client Registration (DCR)
+    Client->>Apigee: POST /atlassian-mcp/v1/mcp/authv2 (Register Client Metadata)
     Apigee->>Atlassian: Forward POST /v1/mcp/authv2
     Atlassian-->>Apigee: 200 OK (Atlassian Client ID & Secret)
     Apigee-->>Client: Dynamic Credentials Returned
@@ -36,14 +44,14 @@ sequenceDiagram
     
     Client->>Atlassian: Authenticate & Consent (SSO)
     Atlassian-->>Apigee: 302 Callback (Code=AtlassianCode, State)
-    Apigee->>Apigee: Read Cached Client Callback
+    Apigee->>Apigee: Read Cached Client Callback & Invalidate Cache Entry
     Apigee-->>Client: 302 Redirect to ClientCallback (Code=AtlassianCode, State)
     
     Note over Client, Atlassian: Exchange Code for Access Token
     Client->>Apigee: POST /atlassian-mcp/oauth2/token (Grant=authorization_code, Code=AtlassianCode)
     Apigee->>Atlassian: Forward POST /oauth/token
     Atlassian-->>Apigee: 200 OK (Atlassian Access Token)
-    Apigee->>Apigee: Service Callout /me, Cache User Profile
+    Apigee->>Apigee: Service Callout /me, Cache User Profile (Hashed Token Key)
     Apigee-->>Client: Dynamic Token Response Returned
 ```
 
