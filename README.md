@@ -1,20 +1,21 @@
-# Atlassian MCP Apigee Proxy
+# MCP Apigee Proxies (Atlassian & GitHub)
 
-This repository contains the configuration and codebase for placing an **Apigee API Gateway** in-between **Model Context Protocol (MCP) clients** and the cloud-hosted **Atlassian Rovo MCP Server** (`https://mcp.atlassian.com`) in a multitenant environment.
+This repository contains the configuration and codebase for placing an **Apigee API Gateway** in-between **Model Context Protocol (MCP) clients** and cloud-hosted MCP servers (**Atlassian Rovo** and **GitHub**) in a multitenant environment.
 
-The gateway intercepts MCP requests, dynamically manages client credentials and OAuth redirects under the tenant-specific namespace, validates Atlassian-issued tokens via edge-caching introspection, captures end-user identity metadata, and forwards authorized requests downstream.
+The gateways intercept MCP requests, dynamically manage client credentials and OAuth redirects under tenant-specific namespaces, validate tokens via edge-caching introspection, capture end-user identity metadata, and forward authorized requests downstream.
 
 ---
 
 ## Project Structure
 
 * **`atlassian-mcp-proxy/apiproxy/`**: The dedicated Atlassian MCP proxy bundle (`atlassian-mcp`), exposing dynamic client registration passthroughs and introspective resource access.
+* **`github-mcp-proxy/apiproxy/`**: The dedicated GitHub MCP proxy bundle (`github-mcp`), exposing OAuth discovery metadata, OIDC configuration, authorization redirects, token exchange, and authenticated tool calls with user identity injection.
 
 ---
 
-## Architecture & Authorization Flow
+## Atlassian MCP Proxy Architecture & Authorization Flow
 
-The authentication flow utilizes **RFC 9728** (Protected Resource Metadata) for discovery, dynamically registers client credentials, intercepts OAuth 3LO redirects to capture codes, and proxies token exchanges back to Atlassian while caching the sessions at the edge.
+The authentication flow utilizes **RFC 9728** (Protected Resource Metadata) for discovery, dynamically registers client credentials, intercepts OAuth 3LO redirects to capture codes, and proxies token exchanges back to Atlassian while caching sessions at the edge.
 
 ### Flow 1: RFC 9728 Discovery, Dynamic Registration & Token Acquisition (SSO)
 ```mermaid
@@ -40,7 +41,7 @@ sequenceDiagram
     Note over Client, Apigee: Dynamic Client Registration (DCR)
     Client->>Apigee: POST /atlassian-mcp/v1/mcp/authv2 (Register Client Metadata)
     Apigee->>Atlassian: Forward POST /v1/mcp/authv2
-    Atlassian-->>Apigee: 200 OK (Atlassian Client ID & Secret)
+    Atlassian-->>Atlassian: 200 OK (Atlassian Client ID & Secret)
     Apigee-->>Client: Dynamic Credentials Returned
     
     Note over Client, Atlassian: Start Authorize Redirect Flow
@@ -56,7 +57,7 @@ sequenceDiagram
     Note over Client, Atlassian: Exchange Code for Access Token
     Client->>Apigee: POST /atlassian-mcp/oauth2/token (Grant=authorization_code, Code=AtlassianCode)
     Apigee->>Atlassian: Forward POST /oauth/token
-    Atlassian-->>Apigee: 200 OK (Atlassian Access Token)
+    Atlassian-->>Atlassian: 200 OK (Atlassian Access Token)
     Apigee->>Apigee: Service Callout /me, Cache User Profile (Hashed Token Key)
     Apigee-->>Client: Dynamic Token Response Returned
 ```
@@ -78,7 +79,7 @@ sequenceDiagram
         Cache-->>Apigee: User Profile JSON (email, account_id)
     else Cache Miss
         Apigee->>AtlassianAPI: GET /me (Authorization: Bearer AtlassianToken)
-        AtlassianAPI-->>Apigee: 200 OK User Profile JSON
+        AtlassianAPI-->>Atlassian: 200 OK User Profile JSON
         Apigee->>Cache: PopulateCache (User Profile JSON)
     end
 
@@ -91,90 +92,110 @@ sequenceDiagram
 
 ---
 
-## Why Apigee?
+## GitHub MCP Proxy Architecture & Flow
 
-This API proxy acts as a smart mediator between your local MCP tools and Atlassian. By deploying this gateway, you get:
+The GitHub MCP proxy provides secure mediation between local MCP tools and GitHub, handling OIDC/OAuth discovery, token exchange, and user identity extraction (`X-End-User-Email`, `X-End-User-Sub`, `X-End-User-Login`).
 
-* **Zero-Configuration Client Onboarding**: You don't need to configure redirect URIs for every single developer's IDE or local harness. Apigee acts as a single secure callback endpoint and routes authorization flows back to local client apps automatically.
-* **Super-Fast Response Times**: User profiles are validated and cached at the network edge for 10 minutes. This eliminates redundant introspection calls to Atlassian APIs, making your developer tools feel snappy.
-* **Production-Grade Security**:
-  * **Hashed Keys**: Plaintext Atlassian access tokens are never used as keys or stored raw in memory—they are cryptographically hashed (SHA-256) natively on the gateway.
-  * **One-Time Redirect Cleanups**: State callback URLs are deleted instantly after use to prevent session-replay attacks.
-  * **Edge CORS Mediation**: Browser preflight OPTIONS requests are handled locally at the gateway, avoiding downstream Atlassian rejection of DELETE/PUT methods.
-* **Traceable Auditing**: Apigee automatically links Atlassian tokens to actual developer identities (`X-End-User-Email` and `X-End-User-Sub` headers) so you have full visibility into which developer is querying which corporate documents.
-* **Payload Crash Protection**: Sanitizes downstream encoding headers (such as removing unsupported Brotli encoding) to prevent gateway XML parser faults.
+### Flow 1: OIDC Discovery & OAuth Token Exchange
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client as MCP Client
+    participant Apigee as Apigee Gateway
+    participant GitHub as GitHub OAuth & API
 
+    Note over Client, Apigee: OIDC & OAuth Discovery
+    Client->>Apigee: GET /.well-known/openid-configuration/github-mcp
+    Apigee->>GitHub: GET /login/oauth/.well-known/openid-configuration
+    GitHub-->>Apigee: OIDC Metadata JSON
+    Apigee->>Apigee: JavaScript-RewriteOpenIdConfiguration
+    Apigee-->>Client: Mediated OIDC Metadata
 
+    Note over Client, Apigee: Authorize & Token Exchange
+    Client->>Apigee: GET /github-mcp/oauth2/authorize
+    Apigee-->>Client: 302 Redirect to GitHub /login/oauth/authorize
+    Client->>GitHub: Authenticate & Authorize
+    GitHub-->>Apigee: 302 Callback (Code)
+    Apigee-->>Client: 302 Redirect to Client Callback
+    Client->>Apigee: POST /github-mcp/oauth2/token
+    Apigee->>GitHub: POST /login/oauth/access_token
+    GitHub-->>Apigee: GitHub Access Token
+    Apigee->>GitHub: GET /user (User Profile)
+    GitHub-->>Apigee: User Profile (id, email, login)
+    Apigee->>Apigee: PopulateCache (Hashed Token Key)
+    Apigee-->>Client: Token Response
+```
 
+### Flow 2: Authenticated Tool Calls & Metadata Injection
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client as MCP Client
+    participant Apigee as Apigee Gateway
+    participant Cache as Apigee Cache
+    participant GitHubAPI as GitHub API (/user)
+    participant GitHubMCP as GitHub MCP Server
+
+    Client->>Apigee: POST /github-mcp/mcp (Bearer Token)
+    Apigee->>Cache: LookupCache (Hashed Token)
+    
+    alt Cache Hit
+        Cache-->>Apigee: Cached User Profile
+    else Cache Miss
+        Apigee->>GitHubAPI: GET /user
+        GitHubAPI-->>Apigee: User Profile (id, email, login)
+        Apigee->>Cache: PopulateCache
+    end
+
+    Apigee->>Apigee: Extract id, email, login
+    Apigee->>Apigee: Set Headers: X-End-User-Sub, X-End-User-Email, X-End-User-Login
+    Apigee->>GitHubMCP: Forward Request with User Headers
+    GitHubMCP-->>Apigee: Response
+    Apigee-->>Client: Response
+```
 
 ---
 
 ## Client Integration Guide
 
-To configure your local developer harnesses to query Jira and Confluence through the Apigee Gateway, follow the setup instructions below.
+To configure your local developer harnesses to query Atlassian or GitHub through the Apigee Gateway:
 
 ### 1. **Cursor IDE**
-Cursor supports Dynamic Client Registration (DCR) for remote MCP servers.
-1. Create or edit the `mcp.json` configuration file:
-   * **Project Scope**: `.cursor/mcp.json` (inside your project directory root)
-   * **Global Scope**: `~/.cursor/mcp.json`
-2. Add your server configuration pointing to the gateway endpoint:
+1. Create or edit `mcp.json` (`.cursor/mcp.json` or `~/.cursor/mcp.json`):
    ```json
    {
      "mcpServers": {
        "atlassian-apigee": {
          "url": "https://YOUR_APIGEE_HOST/atlassian-mcp/v1/mcp"
+       },
+       "github-apigee": {
+         "url": "https://YOUR_APIGEE_HOST/github-mcp/mcp/"
        }
      }
    }
    ```
-3. Save the file. Cursor will automatically reload the configuration, detect that authentication is required, and prompt you to complete the Atlassian OAuth login flow in your browser.
+2. Save the file and complete the browser authentication prompt.
 
 ### 2. **Claude Code (CLI)**
-Claude Code natively supports dynamic OAuth discovery and login for remote HTTP servers.
-1. In your terminal, run the following command to add the server:
+1. Run:
    ```bash
-   claude mcp add --transport http atlassian-apigee https://workshop.iloveapi.management/atlassian-mcp/v1/mcp
+   claude mcp add --transport http atlassian-apigee https://YOUR_APIGEE_HOST/atlassian-mcp/v1/mcp
+   claude mcp add --transport http github-apigee https://YOUR_APIGEE_HOST/github-mcp/mcp/
    ```
-2. Claude Code will initialize the connection, detect the authentication challenge from the gateway, and prompt you to run:
-   ```bash
-   claude mcp login atlassian-apigee
-   ```
-3. Follow the instructions to log in through your browser and authorize the client.
-
-
-### 3. **VS Code / GitHub Copilot**
-For VS Code extensions (like GitHub Copilot Chat or other MCP client plugins) that support remote servers:
-1. Configure the server endpoint to: `https://workshop.iloveapi.management/atlassian-mcp/v1/mcp` (or `/v1/sse` depending on the extension's transport preference).
-2. The extension will automatically register, detect that authentication is required, and prompt you to authorize through your browser.
-
-
-
----
-
-## Enhancements & Add-Ons
-
-To further extend and scale your Atlassian MCP Gateway, consider implementing the following production-grade add-ons:
-
-### 1. Guarding Against Tool Poisoning with **Model Armor**
-Because MCP tools receive prompts and parameters generated directly by LLMs, they are vulnerable to **prompt injection** and **indirect tool poisoning** (e.g. an LLM reads a poisoned Confluence page and generates a malicious command parameters payload back to the gateway).
-* **Mitigation**: Deploy Google Cloud **Model Armor** policies on Apigee to scan incoming LLM requests and responses. This filters out prompt injections, personally identifiable information (PII) leakage, and content policy violations before payloads reach the target system.
-* For setup details, see the [Apigee Model Armor Tutorial](https://docs.cloud.google.com/apigee/docs/api-platform/tutorials/using-model-armor-policies).
-
-### 2. Monitoring, Logging, and Tracing Streamable HTTP Connections
-Since MCP utilizes persistent streamable HTTP connections (which rely on SSE under the hood for event pushing):
-* **Streaming Logging**: Ensure your gateway logging policies (like MessageLogging or syslog integration) do not block or buffer streaming payloads. For streaming data patterns, refer to the [Apigee Server-Sent Events Guide](https://docs.cloud.google.com/apigee/docs/api-platform/develop/server-sent-events).
-* **Distributed Tracing**: Attach Google Cloud Trace to your API proxy to measure latencies across the dynamic callback routes and introspections, identifying downstream bottleneck paths.
-* **API Monitoring**: Set up customized alerting dashboards in Apigee API Monitoring to track response error rates (e.g. 401s, 403s) and token cache-hit ratios.
+2. Run `claude mcp login atlassian-apigee` / `github-apigee` and complete browser authentication.
 
 ---
 
 ## Deployment
 
-Deployments are performed using **`apigeecli`**. Please refer to the official [apigeecli repository](https://github.com/apigee/apigeecli) for installation instructions.
+Deployments are performed using **`apigeecli`**.
 
-Deploy the Atlassian MCP API proxy bundle to your Apigee Organization using the `apiproxy` directory:
-
+### Deploy Atlassian MCP Proxy
 ```bash
 apigeecli apis create bundle -n atlassian-mcp -f ./atlassian-mcp-proxy/apiproxy -o <YOUR_ORG> -e <YOUR_ENV> --default-token --ovr --wait
+```
+
+### Deploy GitHub MCP Proxy
+```bash
+apigeecli apis create bundle -n github-mcp -f ./github-mcp-proxy/apiproxy -o <YOUR_ORG> -e <YOUR_ENV> --default-token --ovr --wait
 ```
