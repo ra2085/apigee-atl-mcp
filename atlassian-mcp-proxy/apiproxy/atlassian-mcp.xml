@@ -38,7 +38,6 @@
     <Policy>SC-Atlassian-Me-Callback</Policy>
     <Policy>EV-Atlassian-Me-Callback</Policy>
     <Policy>MCP-SetExternalClientId</Policy>
-    <Policy>Oauth2-ImportExternalCode</Policy>
     <Policy>OAuthV2-GenerateAccessToken-AuthCode</Policy>
     <Policy>EV-Extract-Response-Token</Policy>
     <Policy>PC-User-Profile-Callback</Policy>
@@ -55,6 +54,15 @@
     <Policy>AM-Set-OIDC-Target-Path</Policy>
     <Policy>AM-Atlassian-OpenIdConfiguration</Policy>
     <Policy>AM-Set-Registration-Target-Path</Policy>
+    <Policy>JavaScript-RewriteRegistration</Policy>
+    <Policy>RF-Session-Expired</Policy>
+    <Policy>AM-Set-PRM-Target-Path</Policy>
+    <Policy>JavaScript-RewriteTokenRedirectUri</Policy>
+    <Policy>AM-Set-OASM-Target-Path-Global</Policy>
+    <Policy>AM-Set-User-Profile</Policy>
+    <Policy>AM-Clean-Accept-Encoding</Policy>
+    <Policy>AM-Hash-Token</Policy>
+    <Policy>IC-Client-Redirect-Uri</Policy>
   </Policies>
   <ProxyEndpoints>
     <ProxyEndpoint>mcp-resource</ProxyEndpoint>
@@ -66,4 +74,26 @@
     <TargetEndpoint>atlassian-oauth</TargetEndpoint>
     <TargetEndpoint>atlassian-prm</TargetEndpoint>
   </TargetEndpoints>
+  <ResourceFiles>
+    <ResourceFile>
+      <Name>rewrite-auth-server.js</Name>
+      <Type>jsc</Type>
+    </ResourceFile>
+    <ResourceFile>
+      <Name>rewrite-oidc.js</Name>
+      <Type>jsc</Type>
+    </ResourceFile>
+    <ResourceFile>
+      <Name>rewrite-prm.js</Name>
+      <Type>jsc</Type>
+    </ResourceFile>
+    <ResourceFile>
+      <Name>rewrite-registration.js</Name>
+      <Type>jsc</Type>
+    </ResourceFile>
+    <ResourceFile>
+      <Name>rewrite-token-redirect-uri.js</Name>
+      <Type>jsc</Type>
+    </ResourceFile>
+  </ResourceFiles>
 </APIProxy>
