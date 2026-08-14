@@ -10,7 +10,7 @@ The gateways intercept MCP requests, dynamically manage client credentials and O
 
 * **`atlassian-mcp-proxy/apiproxy/`**: The dedicated Atlassian MCP proxy bundle (`atlassian-mcp`), exposing dynamic client registration passthroughs and introspective resource access.
 * **`github-mcp-proxy/apiproxy/`**: The dedicated GitHub MCP proxy bundle (`github-mcp`), exposing OAuth discovery metadata, OIDC configuration, authorization redirects, token exchange, and authenticated tool calls with user identity injection.
-* **`bq-mcp-proxy/apiproxy/`**: The dedicated Google Cloud BigQuery MCP proxy bundle (`bq-mcp`), exposing RFC 9728 discovery, Google OAuth 2.0 / OIDC metadata, 3LO authorization redirection, token exchange mediation, userinfo caching, and end-user identity metadata injection.
+* **`bq-mcp-proxy/apiproxy/`**: The dedicated Google Cloud BigQuery MCP proxy bundle (`bq-mcp`), supporting **both Dynamic Client Registration (DCR) and OAuth 2.0 Authorization Code flows** by bridging MCP specification requirements with Google Cloud OAuth 2.0.
 
 ---
 
@@ -159,24 +159,36 @@ sequenceDiagram
 
 ## BigQuery MCP Proxy Architecture & Flow
 
-The BigQuery MCP proxy mediates between local/remote MCP clients and Google Cloud BigQuery MCP backend. It uses Google Cloud OAuth 2.0 credentials for consent and token acquisition, caches Google user profile info (`userinfo`), and injects end-user identity metadata (`X-End-User-Email`, `X-End-User-Sub`, `X-End-User-Name`) into downstream BigQuery requests.
+Google and Google Cloud remote MCP servers (including BigQuery MCP) do not natively support MCP authorization extensions such as:
+* [Dynamic Client Registration (RFC 7591)](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization#dynamic-client-registration)
+* [OAuth Client ID Metadata Documents](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization#client-id-metadata-documents)
 
-### Flow 1: RFC 9728 / OIDC Discovery & Google OAuth Token Exchange
+To bridge this gap without distributing static API keys or pre-provisioned developer credentials to end users, the **BigQuery MCP Proxy (`bq-mcp`)** acts as the mediator:
+1. **Stateless Dynamic Client Registration (RFC 7591)**: Exposes `POST /bq-mcp/oauth2/register` and advertises it in RFC 8414 Authorization Server Metadata. Apigee generates an ephemeral client registration on the fly with zero persistent storage in Apigee, enabling MCP clients (Cursor, Claude Code, etc.) to configure themselves automatically.
+2. **Standard OAuth 2.0 3LO Mediation**: Redirects the user to Google OAuth (`accounts.google.com`) for direct user consent.
+3. **Confidential Token Exchange**: Exchanges the authorization code against Google OAuth (`oauth2.googleapis.com/token`) using confidential web application credentials stored in a Property Set (`google-oauth.properties`), stripping non-standard parameters (`code_verifier`, `resource`) not accepted for confidential Google OAuth web clients.
+4. **Edge Userinfo Introspection & Identity Injection**: Introspects the user profile via Google OIDC userinfo (`openidconnect.googleapis.com/v1/userinfo`), caches it for 600s, and injects `X-End-User-Email`, `X-End-User-Sub`, and `X-End-User-Name` into downstream BigQuery MCP tool calls.
+
+### Flow 1: PRM Discovery, Stateless DCR & Google OAuth Token Exchange
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Client as MCP Client
+    participant Client as MCP Client (Cursor / Claude)
     participant Apigee as Apigee Gateway
     participant Google as Google Cloud OAuth & Userinfo
 
-    Note over Client, Apigee: Discovery Phase
+    Note over Client, Apigee: 1. Discovery (RFC 9728 / RFC 8414)
     Client->>Apigee: GET /.well-known/oauth-protected-resource/bq-mcp
     Apigee-->>Client: PRM Metadata (Scopes: bigquery, cloud-platform, openid, email, profile)
 
-    Client->>Apigee: GET /.well-known/openid-configuration/bq-mcp
-    Apigee-->>Client: OIDC Configuration (Auth & Token Endpoints)
+    Client->>Apigee: GET /.well-known/oauth-authorization-server/bq-mcp
+    Apigee-->>Client: OASM Metadata (auth, token, and registration endpoints)
 
-    Note over Client, Apigee: Authorize & Consent Flow
+    Note over Client, Apigee: 2. Stateless Dynamic Client Registration (RFC 7591)
+    Client->>Apigee: POST /bq-mcp/oauth2/register
+    Apigee-->>Client: 201 Created (Ephemeral client_id, token_endpoint_auth_method: "none")
+
+    Note over Client, Google: 3. Authorize & User Consent (3LO)
     Client->>Apigee: GET /bq-mcp/oauth2/authorize?client_id=...&redirect_uri=ClientCallback&state=...
     Apigee->>Apigee: Cache Client Callback (Key: State)
     Apigee-->>Client: 302 Redirect to Google OAuth (accounts.google.com)
@@ -186,9 +198,9 @@ sequenceDiagram
     Apigee->>Apigee: Retrieve Client Callback from Cache & Invalidate
     Apigee-->>Client: 302 Redirect to ClientCallback (Code=GoogleAuthCode, State)
 
-    Note over Client, Apigee: Token Exchange
+    Note over Client, Google: 4. Token Exchange
     Client->>Apigee: POST /bq-mcp/oauth2/token (code, redirect_uri)
-    Apigee->>Apigee: Inject Google Client ID, Secret & Mediated Callback
+    Apigee->>Apigee: Inject Google Client ID & Secret from Property Set, Strip PKCE/Resource
     Apigee->>Google: POST https://oauth2.googleapis.com/token
     Google-->>Apigee: 200 OK (Google Access Token, ID Token, Refresh Token)
     Apigee->>Google: GET https://openidconnect.googleapis.com/v1/userinfo
@@ -266,7 +278,7 @@ claude mcp login bigquery-apigee
 
 ## Deployment
 
-Deployments are performed using **`apigeecli`**.
+Deployments are performed using **`apigeecli`** (located at `~/.apigeecli/bin/apigeecli`).
 
 ### Deploy Atlassian MCP Proxy
 ```bash

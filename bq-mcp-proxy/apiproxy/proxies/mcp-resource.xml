@@ -27,7 +27,7 @@
       </Step>
       <Step>
         <Name>EV-Extract-Tenant-Id</Name>
-        <Condition>(proxy.pathsuffix MatchesPath "/oauth2/**") or (proxy.pathsuffix MatchesPath "/v1/mcp/authv2/*")</Condition>
+        <Condition>(proxy.pathsuffix MatchesPath "/oauth2/**")</Condition>
       </Step>
     </Request>
     <Response/>
@@ -92,49 +92,15 @@
       <Response/>
       <Condition>((proxy.pathsuffix MatchesPath "/oauth2/*/token") or (proxy.pathsuffix MatchesPath "/oauth2/token") or (proxy.pathsuffix MatchesPath "/token")) and (request.verb = "POST")</Condition>
     </Flow>
-    <Flow name="mcp-v1">
-      <Description>MCP v1 Endpoint</Description>
-      <Request>
+    <Flow name="/register">
+      <Description>Dynamic Client Registration Mock (RFC 7591)</Description>
+      <Request/>
+      <Response>
         <Step>
-          <Name>RF-Unauthorized</Name>
-          <Condition>request.header.Authorization == null</Condition>
+          <Name>AM-Mock-Registration-Response</Name>
         </Step>
-        <Step>
-          <Name>AM-Hash-Token</Name>
-        </Step>
-        <Step>
-          <Name>LC-User-Profile</Name>
-        </Step>
-        <Step>
-          <Name>EV-Cached-User-Profile</Name>
-          <Condition>user_profile != null</Condition>
-        </Step>
-        <Step>
-          <Name>SC-Google-Userinfo</Name>
-          <Condition>user_profile == null</Condition>
-        </Step>
-        <Step>
-          <Name>EV-Google-Userinfo</Name>
-          <Condition>(user_profile == null) and (userinfoResponse.status.code = 200)</Condition>
-        </Step>
-        <Step>
-          <Name>PC-User-Profile</Name>
-          <Condition>(user_profile == null) and (userinfoResponse.status.code = 200)</Condition>
-        </Step>
-        <Step>
-          <Name>AM-Set-User-Profile</Name>
-          <Condition>(user_profile == null) and (userinfoResponse.status.code = 200)</Condition>
-        </Step>
-        <Step>
-          <Name>RF-Unauthorized</Name>
-          <Condition>user_profile == null</Condition>
-        </Step>
-        <Step>
-          <Name>AM-Capture-User-Metadata</Name>
-        </Step>
-      </Request>
-      <Response/>
-      <Condition>(proxy.pathsuffix MatchesPath "/mcp/**") or (proxy.pathsuffix MatchesPath "/mcp") or (proxy.pathsuffix MatchesPath "/v1/mcp/**") or (proxy.pathsuffix MatchesPath "/v1/mcp") or (proxy.pathsuffix MatchesPath "/") or (proxy.pathsuffix = "")</Condition>
+      </Response>
+      <Condition>((proxy.pathsuffix MatchesPath "/oauth2/*/register") or (proxy.pathsuffix MatchesPath "/oauth2/register") or (proxy.pathsuffix MatchesPath "/register") or (proxy.pathsuffix MatchesPath "/v1/mcp/authv2/*") or (proxy.pathsuffix MatchesPath "/v1/mcp/authv2")) and (request.verb = "POST")</Condition>
     </Flow>
     <Flow name="sse-v1">
       <Description>SSE v1 Endpoint</Description>
@@ -180,20 +146,49 @@
       <Response/>
       <Condition>((proxy.pathsuffix MatchesPath "/v1/sse") or (proxy.pathsuffix MatchesPath "/sse")) and (request.verb = "GET")</Condition>
     </Flow>
-    <Flow name="authv2-v1">
-      <Description>Authv2 v1 Endpoint (Dynamic Client Registration / OAuth Passthrough)</Description>
+    <Flow name="mcp-v1">
+      <Description>MCP v1 Endpoint</Description>
       <Request>
         <Step>
-          <Name>JavaScript-RewriteRegistration</Name>
+          <Name>RF-Unauthorized</Name>
+          <Condition>request.header.Authorization == null</Condition>
+        </Step>
+        <Step>
+          <Name>AM-Hash-Token</Name>
+        </Step>
+        <Step>
+          <Name>LC-User-Profile</Name>
+        </Step>
+        <Step>
+          <Name>EV-Cached-User-Profile</Name>
+          <Condition>user_profile != null</Condition>
+        </Step>
+        <Step>
+          <Name>SC-Google-Userinfo</Name>
+          <Condition>user_profile == null</Condition>
+        </Step>
+        <Step>
+          <Name>EV-Google-Userinfo</Name>
+          <Condition>(user_profile == null) and (userinfoResponse.status.code = 200)</Condition>
+        </Step>
+        <Step>
+          <Name>PC-User-Profile</Name>
+          <Condition>(user_profile == null) and (userinfoResponse.status.code = 200)</Condition>
+        </Step>
+        <Step>
+          <Name>AM-Set-User-Profile</Name>
+          <Condition>(user_profile == null) and (userinfoResponse.status.code = 200)</Condition>
+        </Step>
+        <Step>
+          <Name>RF-Unauthorized</Name>
+          <Condition>user_profile == null</Condition>
+        </Step>
+        <Step>
+          <Name>AM-Capture-User-Metadata</Name>
         </Step>
       </Request>
-      <Response>
-        <Step>
-          <Name>JavaScript-RewriteRegistration</Name>
-          <Condition>response.status.code = 200 or response.status.code = 201</Condition>
-        </Step>
-      </Response>
-      <Condition>(proxy.pathsuffix MatchesPath "/v1/mcp/authv2/*")</Condition>
+      <Response/>
+      <Condition>(proxy.pathsuffix MatchesPath "/mcp") or (proxy.pathsuffix MatchesPath "/mcp/**") or (proxy.pathsuffix MatchesPath "/v1/mcp") or (proxy.pathsuffix MatchesPath "/v1/mcp/**") or (proxy.pathsuffix MatchesPath "/") or (proxy.pathsuffix = "")</Condition>
     </Flow>
   </Flows>
   <HTTPProxyConnection>
@@ -204,10 +199,10 @@
     <Condition>request.verb = "OPTIONS"</Condition>
   </RouteRule>
   <RouteRule name="no-target">
-    <Condition>(proxy.pathsuffix MatchesPath "/oauth2/*/authorize") or (proxy.pathsuffix MatchesPath "/oauth2/authorize") or (proxy.pathsuffix MatchesPath "/authorize") or (proxy.pathsuffix MatchesPath "/oauth2/callback") or (proxy.pathsuffix MatchesPath "/callback")</Condition>
+    <Condition>(proxy.pathsuffix MatchesPath "/oauth2/*/authorize") or (proxy.pathsuffix MatchesPath "/oauth2/authorize") or (proxy.pathsuffix MatchesPath "/authorize") or (proxy.pathsuffix MatchesPath "/oauth2/callback") or (proxy.pathsuffix MatchesPath "/callback") or (proxy.pathsuffix MatchesPath "/oauth2/*/register") or (proxy.pathsuffix MatchesPath "/oauth2/register") or (proxy.pathsuffix MatchesPath "/register") or (proxy.pathsuffix MatchesPath "/v1/mcp/authv2/*") or (proxy.pathsuffix MatchesPath "/v1/mcp/authv2")</Condition>
   </RouteRule>
   <RouteRule name="oauth">
-    <Condition>(proxy.pathsuffix MatchesPath "/oauth2/**") or (proxy.pathsuffix MatchesPath "/v1/mcp/authv2/*") or (proxy.pathsuffix MatchesPath "/token")</Condition>
+    <Condition>(proxy.pathsuffix MatchesPath "/oauth2/**") or (proxy.pathsuffix MatchesPath "/token")</Condition>
     <TargetEndpoint>google-oauth</TargetEndpoint>
   </RouteRule>
   <RouteRule name="default">

@@ -48,6 +48,7 @@
     <Policy>AM-Mock-PRM-Response</Policy>
     <Policy>AM-Mock-OASM-Response</Policy>
     <Policy>AM-Mock-OIDC-Response</Policy>
+    <Policy>AM-Mock-Registration-Response</Policy>
     <Policy>JavaScript-RewriteAuthServer</Policy>
     <Policy>JavaScript-RewriteOpenIdConfiguration</Policy>
     <Policy>AM-Set-OASM-Target-Path</Policy>

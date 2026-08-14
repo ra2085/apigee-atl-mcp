@@ -14,45 +14,33 @@
  See the License for the specific language governing permissions and
  limitations under the License.
 -->
-<AssignMessage continueOnError="false" enabled="true" name="AM-Mock-OASM-Response">
-  <DisplayName>AM-Mock-OASM-Response</DisplayName>
+<AssignMessage continueOnError="false" enabled="true" name="AM-Mock-Registration-Response">
+  <DisplayName>AM-Mock-Registration-Response</DisplayName>
   <Set>
     <Headers>
       <Header name="Content-Type">application/json</Header>
       <Header name="Access-Control-Allow-Origin">*</Header>
     </Headers>
     <Payload contentType="application/json">{
-  "issuer": "https://{original_host}/bq-mcp/oauth2",
-  "authorization_endpoint": "https://{original_host}/bq-mcp/oauth2/authorize",
-  "token_endpoint": "https://{original_host}/bq-mcp/oauth2/token",
+  "client_id": "mcp-client-{createUuid()}",
+  "client_name": "MCP Client",
   "registration_endpoint": "https://{original_host}/bq-mcp/oauth2/register",
-  "response_types_supported": [
-    "code"
+  "redirect_uris": [
+    "https://{original_host}/bq-mcp/oauth2/callback"
   ],
-  "grant_types_supported": [
+  "grant_types": [
     "authorization_code",
     "refresh_token"
   ],
-  "token_endpoint_auth_methods_supported": [
-    "client_secret_post",
-    "client_secret_basic",
-    "none"
+  "response_types": [
+    "code"
   ],
-  "scopes_supported": [
-    "https://www.googleapis.com/auth/bigquery",
-    "https://www.googleapis.com/auth/cloud-platform",
-    "openid",
-    "email",
-    "profile"
-  ],
-  "code_challenge_methods_supported": [
-    "S256",
-    "plain"
-  ]
+  "token_endpoint_auth_method": "none",
+  "client_id_issued_at": {system.timestamp}
 }</Payload>
-    <StatusCode>200</StatusCode>
-    <ReasonPhrase>OK</ReasonPhrase>
+    <StatusCode>201</StatusCode>
+    <ReasonPhrase>Created</ReasonPhrase>
   </Set>
   <IgnoreUnresolvedVariables>true</IgnoreUnresolvedVariables>
-  <AssignTo createNew="false" transport="http" type="response"/>
+  <AssignTo createNew="true" transport="http" type="response"/>
 </AssignMessage>

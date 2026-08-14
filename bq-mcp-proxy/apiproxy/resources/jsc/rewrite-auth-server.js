@@ -14,20 +14,22 @@
  * limitations under the License.
  */
 try {
-    var payloadStr = context.getVariable("response.content");
-    if (payloadStr) {
-        var payload = JSON.parse(payloadStr);
-        var host = context.getVariable("original_host") || context.getVariable("request.header.host");
-        var tenantId = context.getVariable("tenant_id");
+    var content = context.getVariable("response.content");
+    var host = context.getVariable("original_host") || context.getVariable("request.header.host");
+    var tenantId = context.getVariable("tenant_id");
+    
+    if (content) {
+        var payload = JSON.parse(content);
         if (tenantId) {
             payload.issuer = "https://" + host + "/bq-mcp/oauth2/" + tenantId;
             payload.authorization_endpoint = "https://" + host + "/bq-mcp/oauth2/" + tenantId + "/authorize";
             payload.token_endpoint = "https://" + host + "/bq-mcp/oauth2/" + tenantId + "/token";
-            payload.registration_endpoint = "https://" + host + "/bq-mcp/v1/mcp/authv2/" + tenantId;
+            payload.registration_endpoint = "https://" + host + "/bq-mcp/oauth2/" + tenantId + "/register";
         } else {
             payload.issuer = "https://" + host + "/bq-mcp/oauth2";
             payload.authorization_endpoint = "https://" + host + "/bq-mcp/oauth2/authorize";
             payload.token_endpoint = "https://" + host + "/bq-mcp/oauth2/token";
+            payload.registration_endpoint = "https://" + host + "/bq-mcp/oauth2/register";
         }
         context.setVariable("response.content", JSON.stringify(payload));
     }

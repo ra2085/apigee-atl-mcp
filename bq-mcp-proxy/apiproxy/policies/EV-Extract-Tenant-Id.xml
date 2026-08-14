@@ -16,14 +16,18 @@
 -->
 <ExtractVariables continueOnError="false" enabled="true" name="EV-Extract-Tenant-Id">
   <DisplayName>EV-Extract-Tenant-Id</DisplayName>
-  <Source>request</Source>
-  <Variable name="proxy.pathsuffix">
-    <Pattern>/oauth2/{tenant_id}/.well-known/openid-configuration</Pattern>
+  <Properties/>
+  <Source>proxy.pathsuffix</Source>
+  <VariablePrefix>extracted</VariablePrefix>
+  <URIPath>
     <Pattern>/oauth2/{tenant_id}/.well-known/oauth-authorization-server</Pattern>
+    <Pattern>/oauth2/{tenant_id}/.well-known/openid-configuration</Pattern>
     <Pattern>/oauth2/{tenant_id}/authorize</Pattern>
     <Pattern>/oauth2/{tenant_id}/token</Pattern>
-    <Pattern>/v1/mcp/authv2/{tenant_id}</Pattern>
-    <Pattern>/oauth2/{tenant_id}</Pattern>
+    <Pattern>/oauth2/{tenant_id}/register</Pattern>
+  </URIPath>
+  <Variable name="tenant_id">
+    <Pattern>{tenant_id}</Pattern>
   </Variable>
   <IgnoreUnresolvedVariables>true</IgnoreUnresolvedVariables>
 </ExtractVariables>
