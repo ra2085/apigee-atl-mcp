@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--
+ Copyright 2026 Google LLC
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+-->
+<APIProxy revision="1" name="bq-mcp">
+  <DisplayName>bq-mcp</DisplayName>
+  <Description>Google Cloud BigQuery MCP Resource Gateway Proxy</Description>
+  <BasePaths>/bq-mcp</BasePaths>
+  <BasePaths>/.well-known/oauth-protected-resource/bq-mcp</BasePaths>
+  <BasePaths>/.well-known/oauth-authorization-server/bq-mcp</BasePaths>
+  <BasePaths>/.well-known/openid-configuration/bq-mcp</BasePaths>
+  <Policies>
+    <Policy>LC-User-Profile</Policy>
+    <Policy>SC-Google-Userinfo</Policy>
+    <Policy>EV-Google-Userinfo</Policy>
+    <Policy>PC-User-Profile</Policy>
+    <Policy>EV-Cached-User-Profile</Policy>
+    <Policy>AM-Capture-User-Metadata</Policy>
+    <Policy>RF-Unauthorized</Policy>
+    <Policy>CORS-Allow</Policy>
+    <Policy>PC-Client-Redirect-Uri</Policy>
+    <Policy>LC-Client-Redirect-Uri</Policy>
+    <Policy>PC-Client-Id</Policy>
+    <Policy>LC-Client-Id</Policy>
+    <Policy>SC-Google-Userinfo-Callback</Policy>
+    <Policy>EV-Google-Userinfo-Callback</Policy>
+    <Policy>EV-Extract-Response-Token</Policy>
+    <Policy>PC-User-Profile-Callback</Policy>
+    <Policy>AM-RedirectAuth</Policy>
+    <Policy>AM-RedirectToClient</Policy>
+    <Policy>JavaScript-RewritePRM</Policy>
+    <Policy>AM-Capture-Original-Host</Policy>
+    <Policy>EV-Extract-Tenant-Id</Policy>
+    <Policy>AM-Set-OAuth-Target-Path</Policy>
+    <Policy>AM-Rewrite-WWW-Authenticate</Policy>
+    <Policy>AM-Mock-PRM-Response</Policy>
+    <Policy>AM-Mock-OASM-Response</Policy>
+    <Policy>AM-Mock-OIDC-Response</Policy>
+    <Policy>JavaScript-RewriteAuthServer</Policy>
+    <Policy>JavaScript-RewriteOpenIdConfiguration</Policy>
+    <Policy>AM-Set-OASM-Target-Path</Policy>
+    <Policy>AM-Set-OASM-Target-Path-Global</Policy>
+    <Policy>AM-Set-OIDC-Target-Path</Policy>
+    <Policy>AM-Set-PRM-Target-Path</Policy>
+    <Policy>AM-Set-Registration-Target-Path</Policy>
+    <Policy>AM-Set-OAuth-Redirect-Uri</Policy>
+    <Policy>AM-Set-OAuth-Redirect-Uri-Global</Policy>
+    <Policy>AM-Set-OAuth-Redirect-Uri-Tenant</Policy>
+    <Policy>AM-Clean-Accept-Encoding</Policy>
+    <Policy>AM-Hash-Token</Policy>
+    <Policy>IC-Client-Redirect-Uri</Policy>
+    <Policy>JavaScript-RewriteRegistration</Policy>
+    <Policy>JavaScript-RewriteTokenRedirectUri</Policy>
+    <Policy>RF-Session-Expired</Policy>
+    <Policy>AM-Set-User-Profile</Policy>
+  </Policies>
+  <ProxyEndpoints>
+    <ProxyEndpoint>mcp-resource</ProxyEndpoint>
+    <ProxyEndpoint>prm-endpoint</ProxyEndpoint>
+    <ProxyEndpoint>oasm-endpoint</ProxyEndpoint>
+    <ProxyEndpoint>oidc-endpoint</ProxyEndpoint>
+  </ProxyEndpoints>
+  <TargetEndpoints>
+    <TargetEndpoint>bq-mcp</TargetEndpoint>
+    <TargetEndpoint>google-oauth</TargetEndpoint>
+  </TargetEndpoints>
+  <ResourceFiles>
+    <ResourceFile>
+      <Name>google-oauth.properties</Name>
+      <Type>properties</Type>
+    </ResourceFile>
+    <ResourceFile>
+      <Name>rewrite-auth-server.js</Name>
+      <Type>jsc</Type>
+    </ResourceFile>
+    <ResourceFile>
+      <Name>rewrite-oidc.js</Name>
+      <Type>jsc</Type>
+    </ResourceFile>
+    <ResourceFile>
+      <Name>rewrite-prm.js</Name>
+      <Type>jsc</Type>
+    </ResourceFile>
+    <ResourceFile>
+      <Name>rewrite-registration.js</Name>
+      <Type>jsc</Type>
+    </ResourceFile>
+    <ResourceFile>
+      <Name>rewrite-token-redirect-uri.js</Name>
+      <Type>jsc</Type>
+    </ResourceFile>
+    <ResourceFile>
+      <Name>rewrite-www-authenticate.js</Name>
+      <Type>jsc</Type>
+    </ResourceFile>
+  </ResourceFiles>
+</APIProxy>

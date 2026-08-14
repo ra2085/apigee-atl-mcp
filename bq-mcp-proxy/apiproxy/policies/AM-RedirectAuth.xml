@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--
+ Copyright 2026 Google LLC
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+-->
+<AssignMessage continueOnError="false" enabled="true" name="AM-RedirectAuth">
+  <DisplayName>AM-RedirectAuth</DisplayName>
+  <Properties/>
+  <Set>
+    <Headers>
+      <Header name="location">
+        <![CDATA[https://accounts.google.com/o/oauth2/v2/auth?client_id={propertyset.google-oauth.client_id}&redirect_uri=https%3A%2F%2F{original_host}%2Fbq-mcp%2Foauth2%2Fcallback&response_type=code&scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fbigquery+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform+openid+email+profile&state={request.queryparam.state}&access_type=offline&prompt=consent]]>
+      </Header>
+    </Headers>
+    <StatusCode>302</StatusCode>
+  </Set>
+  <IgnoreUnresolvedVariables>true</IgnoreUnresolvedVariables>
+  <AssignTo createNew="true" transport="http" type="response"/>
+</AssignMessage>

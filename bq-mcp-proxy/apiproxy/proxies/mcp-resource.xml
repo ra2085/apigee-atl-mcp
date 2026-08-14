@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--
+ Copyright 2026 Google LLC
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+-->
+<ProxyEndpoint name="mcp-resource">
+  <Description>Google Cloud BigQuery MCP Resource Proxy Endpoint</Description>
+  <FaultRules/>
+  <PreFlow name="PreFlow">
+    <Request>
+      <Step>
+        <Name>CORS-Allow</Name>
+      </Step>
+      <Step>
+        <Name>AM-Capture-Original-Host</Name>
+      </Step>
+      <Step>
+        <Name>EV-Extract-Tenant-Id</Name>
+        <Condition>(proxy.pathsuffix MatchesPath "/oauth2/**") or (proxy.pathsuffix MatchesPath "/v1/mcp/authv2/*")</Condition>
+      </Step>
+    </Request>
+    <Response/>
+  </PreFlow>
+  <PostFlow name="PostFlow">
+    <Request/>
+    <Response/>
+  </PostFlow>
+  <Flows>
+    <Flow name="oauth-authorization-server">
+      <Description>BigQuery-specific OAuth 2.0 Authorization Server metadata</Description>
+      <Request/>
+      <Response>
+        <Step>
+          <Name>JavaScript-RewriteAuthServer</Name>
+          <Condition>response.status.code = 200</Condition>
+        </Step>
+      </Response>
+      <Condition>(proxy.pathsuffix MatchesPath "/oauth2/*/.well-known/oauth-authorization-server") and (request.verb = "GET")</Condition>
+    </Flow>
+    <Flow name="/authorize">
+      <Description>Intercept authorize redirects</Description>
+      <Request>
+        <Step>
+          <Name>PC-Client-Redirect-Uri</Name>
+        </Step>
+        <Step>
+          <Name>PC-Client-Id</Name>
+        </Step>
+      </Request>
+      <Response>
+        <Step>
+          <Name>AM-RedirectAuth</Name>
+        </Step>
+      </Response>
+      <Condition>((proxy.pathsuffix MatchesPath "/oauth2/*/authorize") or (proxy.pathsuffix MatchesPath "/oauth2/authorize") or (proxy.pathsuffix MatchesPath "/authorize")) and (request.verb = "GET")</Condition>
+    </Flow>
+    <Flow name="/callback">
+      <Description>Intercept authorization code redirect callback from Google</Description>
+      <Request>
+        <Step>
+          <Name>LC-Client-Redirect-Uri</Name>
+        </Step>
+        <Step>
+          <Name>RF-Session-Expired</Name>
+          <Condition>oauth_client_redirect_uri == null</Condition>
+        </Step>
+      </Request>
+      <Response>
+        <Step>
+          <Name>AM-RedirectToClient</Name>
+        </Step>
+        <Step>
+          <Name>IC-Client-Redirect-Uri</Name>
+        </Step>
+      </Response>
+      <Condition>((proxy.pathsuffix MatchesPath "/oauth2/callback") or (proxy.pathsuffix MatchesPath "/callback")) and (request.verb = "GET")</Condition>
+    </Flow>
+    <Flow name="/token">
+      <Description>Dynamic Token Exchange intercept</Description>
+      <Request/>
+      <Response/>
+      <Condition>((proxy.pathsuffix MatchesPath "/oauth2/*/token") or (proxy.pathsuffix MatchesPath "/oauth2/token") or (proxy.pathsuffix MatchesPath "/token")) and (request.verb = "POST")</Condition>
+    </Flow>
+    <Flow name="mcp-v1">
+      <Description>MCP v1 Endpoint</Description>
+      <Request>
+        <Step>
+          <Name>RF-Unauthorized</Name>
+          <Condition>request.header.Authorization == null</Condition>
+        </Step>
+        <Step>
+          <Name>AM-Hash-Token</Name>
+        </Step>
+        <Step>
+          <Name>LC-User-Profile</Name>
+        </Step>
+        <Step>
+          <Name>EV-Cached-User-Profile</Name>
+          <Condition>user_profile != null</Condition>
+        </Step>
+        <Step>
+          <Name>SC-Google-Userinfo</Name>
+          <Condition>user_profile == null</Condition>
+        </Step>
+        <Step>
+          <Name>EV-Google-Userinfo</Name>
+          <Condition>(user_profile == null) and (userinfoResponse.status.code = 200)</Condition>
+        </Step>
+        <Step>
+          <Name>PC-User-Profile</Name>
+          <Condition>(user_profile == null) and (userinfoResponse.status.code = 200)</Condition>
+        </Step>
+        <Step>
+          <Name>AM-Set-User-Profile</Name>
+          <Condition>(user_profile == null) and (userinfoResponse.status.code = 200)</Condition>
+        </Step>
+        <Step>
+          <Name>RF-Unauthorized</Name>
+          <Condition>user_profile == null</Condition>
+        </Step>
+        <Step>
+          <Name>AM-Capture-User-Metadata</Name>
+        </Step>
+      </Request>
+      <Response/>
+      <Condition>(proxy.pathsuffix MatchesPath "/mcp/**") or (proxy.pathsuffix MatchesPath "/mcp") or (proxy.pathsuffix MatchesPath "/v1/mcp/**") or (proxy.pathsuffix MatchesPath "/v1/mcp") or (proxy.pathsuffix MatchesPath "/") or (proxy.pathsuffix = "")</Condition>
+    </Flow>
+    <Flow name="sse-v1">
+      <Description>SSE v1 Endpoint</Description>
+      <Request>
+        <Step>
+          <Name>RF-Unauthorized</Name>
+          <Condition>request.header.Authorization == null</Condition>
+        </Step>
+        <Step>
+          <Name>AM-Hash-Token</Name>
+        </Step>
+        <Step>
+          <Name>LC-User-Profile</Name>
+        </Step>
+        <Step>
+          <Name>EV-Cached-User-Profile</Name>
+          <Condition>user_profile != null</Condition>
+        </Step>
+        <Step>
+          <Name>SC-Google-Userinfo</Name>
+          <Condition>user_profile == null</Condition>
+        </Step>
+        <Step>
+          <Name>EV-Google-Userinfo</Name>
+          <Condition>(user_profile == null) and (userinfoResponse.status.code = 200)</Condition>
+        </Step>
+        <Step>
+          <Name>PC-User-Profile</Name>
+          <Condition>(user_profile == null) and (userinfoResponse.status.code = 200)</Condition>
+        </Step>
+        <Step>
+          <Name>AM-Set-User-Profile</Name>
+          <Condition>(user_profile == null) and (userinfoResponse.status.code = 200)</Condition>
+        </Step>
+        <Step>
+          <Name>RF-Unauthorized</Name>
+          <Condition>user_profile == null</Condition>
+        </Step>
+        <Step>
+          <Name>AM-Capture-User-Metadata</Name>
+        </Step>
+      </Request>
+      <Response/>
+      <Condition>((proxy.pathsuffix MatchesPath "/v1/sse") or (proxy.pathsuffix MatchesPath "/sse")) and (request.verb = "GET")</Condition>
+    </Flow>
+    <Flow name="authv2-v1">
+      <Description>Authv2 v1 Endpoint (Dynamic Client Registration / OAuth Passthrough)</Description>
+      <Request>
+        <Step>
+          <Name>JavaScript-RewriteRegistration</Name>
+        </Step>
+      </Request>
+      <Response>
+        <Step>
+          <Name>JavaScript-RewriteRegistration</Name>
+          <Condition>response.status.code = 200 or response.status.code = 201</Condition>
+        </Step>
+      </Response>
+      <Condition>(proxy.pathsuffix MatchesPath "/v1/mcp/authv2/*")</Condition>
+    </Flow>
+  </Flows>
+  <HTTPProxyConnection>
+    <BasePath>/bq-mcp</BasePath>
+    <Properties/>
+  </HTTPProxyConnection>
+  <RouteRule name="no-target-options">
+    <Condition>request.verb = "OPTIONS"</Condition>
+  </RouteRule>
+  <RouteRule name="no-target">
+    <Condition>(proxy.pathsuffix MatchesPath "/oauth2/*/authorize") or (proxy.pathsuffix MatchesPath "/oauth2/authorize") or (proxy.pathsuffix MatchesPath "/authorize") or (proxy.pathsuffix MatchesPath "/oauth2/callback") or (proxy.pathsuffix MatchesPath "/callback")</Condition>
+  </RouteRule>
+  <RouteRule name="oauth">
+    <Condition>(proxy.pathsuffix MatchesPath "/oauth2/**") or (proxy.pathsuffix MatchesPath "/v1/mcp/authv2/*") or (proxy.pathsuffix MatchesPath "/token")</Condition>
+    <TargetEndpoint>google-oauth</TargetEndpoint>
+  </RouteRule>
+  <RouteRule name="default">
+    <TargetEndpoint>bq-mcp</TargetEndpoint>
+  </RouteRule>
+</ProxyEndpoint>

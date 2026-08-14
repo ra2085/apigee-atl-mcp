@@ -1,6 +1,6 @@
-# MCP Apigee Proxies (Atlassian & GitHub)
+# MCP Apigee Proxies (Atlassian, GitHub & BigQuery)
 
-This repository contains the configuration and codebase for placing an **Apigee API Gateway** in-between **Model Context Protocol (MCP) clients** and cloud-hosted MCP servers (**Atlassian Rovo** and **GitHub**) in a multitenant environment.
+This repository contains the configuration and codebase for placing an **Apigee API Gateway** in-between **Model Context Protocol (MCP) clients** and cloud-hosted MCP servers (**Atlassian Rovo**, **GitHub**, and **Google Cloud BigQuery**) in a multitenant environment.
 
 The gateways intercept MCP requests, dynamically manage client credentials and OAuth redirects under tenant-specific namespaces, validate tokens via edge-caching introspection, capture end-user identity metadata, and forward authorized requests downstream.
 
@@ -10,6 +10,7 @@ The gateways intercept MCP requests, dynamically manage client credentials and O
 
 * **`atlassian-mcp-proxy/apiproxy/`**: The dedicated Atlassian MCP proxy bundle (`atlassian-mcp`), exposing dynamic client registration passthroughs and introspective resource access.
 * **`github-mcp-proxy/apiproxy/`**: The dedicated GitHub MCP proxy bundle (`github-mcp`), exposing OAuth discovery metadata, OIDC configuration, authorization redirects, token exchange, and authenticated tool calls with user identity injection.
+* **`bq-mcp-proxy/apiproxy/`**: The dedicated Google Cloud BigQuery MCP proxy bundle (`bq-mcp`), exposing RFC 9728 discovery, Google OAuth 2.0 / OIDC metadata, 3LO authorization redirection, token exchange mediation, userinfo caching, and end-user identity metadata injection.
 
 ---
 
@@ -156,33 +157,110 @@ sequenceDiagram
 
 ---
 
+## BigQuery MCP Proxy Architecture & Flow
+
+The BigQuery MCP proxy mediates between local/remote MCP clients and Google Cloud BigQuery MCP backend. It uses Google Cloud OAuth 2.0 credentials for consent and token acquisition, caches Google user profile info (`userinfo`), and injects end-user identity metadata (`X-End-User-Email`, `X-End-User-Sub`, `X-End-User-Name`) into downstream BigQuery requests.
+
+### Flow 1: RFC 9728 / OIDC Discovery & Google OAuth Token Exchange
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client as MCP Client
+    participant Apigee as Apigee Gateway
+    participant Google as Google Cloud OAuth & Userinfo
+
+    Note over Client, Apigee: Discovery Phase
+    Client->>Apigee: GET /.well-known/oauth-protected-resource/bq-mcp
+    Apigee-->>Client: PRM Metadata (Scopes: bigquery, cloud-platform, openid, email, profile)
+
+    Client->>Apigee: GET /.well-known/openid-configuration/bq-mcp
+    Apigee-->>Client: OIDC Configuration (Auth & Token Endpoints)
+
+    Note over Client, Apigee: Authorize & Consent Flow
+    Client->>Apigee: GET /bq-mcp/oauth2/authorize?client_id=...&redirect_uri=ClientCallback&state=...
+    Apigee->>Apigee: Cache Client Callback (Key: State)
+    Apigee-->>Client: 302 Redirect to Google OAuth (accounts.google.com)
+    
+    Client->>Google: Authenticate & Consent (Google Account)
+    Google-->>Apigee: 302 Callback (Code=GoogleAuthCode, State)
+    Apigee->>Apigee: Retrieve Client Callback from Cache & Invalidate
+    Apigee-->>Client: 302 Redirect to ClientCallback (Code=GoogleAuthCode, State)
+
+    Note over Client, Apigee: Token Exchange
+    Client->>Apigee: POST /bq-mcp/oauth2/token (code, redirect_uri)
+    Apigee->>Apigee: Inject Google Client ID, Secret & Mediated Callback
+    Apigee->>Google: POST https://oauth2.googleapis.com/token
+    Google-->>Apigee: 200 OK (Google Access Token, ID Token, Refresh Token)
+    Apigee->>Google: GET https://openidconnect.googleapis.com/v1/userinfo
+    Google-->>Apigee: Userinfo JSON (email, sub, name)
+    Apigee->>Apigee: PopulateCache (Hashed Token Key)
+    Apigee-->>Client: Return Token Response
+```
+
+### Flow 2: Authenticated MCP Requests & Identity Injection
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client as MCP Client
+    participant Apigee as Apigee Gateway
+    participant Cache as Apigee Cache
+    participant GoogleUserinfo as Google Userinfo API
+    participant BigQueryMCP as BigQuery MCP Server
+
+    Client->>Apigee: POST /bq-mcp/mcp (Authorization: Bearer GoogleAccessToken)
+    Apigee->>Cache: LookupCache (Hashed Token)
+
+    alt Cache Hit
+        Cache-->>Apigee: Cached User Profile
+    else Cache Miss
+        Apigee->>GoogleUserinfo: GET /v1/userinfo (Bearer Token)
+        GoogleUserinfo-->>Apigee: User Profile (email, sub, name)
+        Apigee->>Cache: PopulateCache (TTL: 600s)
+    end
+
+    Apigee->>Apigee: Extract email, sub, name
+    Apigee->>Apigee: Set Headers: X-End-User-Email, X-End-User-Sub, X-End-User-Name
+    Apigee->>BigQueryMCP: Forward Request with Token & Identity Headers
+    BigQueryMCP-->>Apigee: Response Stream
+    Apigee-->>Client: Mediated Response
+```
+
+---
+
 ## Client Integration Guide
 
-To configure your local developer harnesses to query Atlassian or GitHub through the Apigee Gateway:
+To configure your local developer harnesses to query Atlassian, GitHub, or BigQuery through the Apigee Gateway:
 
 ### 1. **Cursor IDE**
-1. Create or edit `mcp.json` (`.cursor/mcp.json` or `~/.cursor/mcp.json`):
-   ```json
-   {
-     "mcpServers": {
-       "atlassian-apigee": {
-         "url": "https://YOUR_APIGEE_HOST/atlassian-mcp/v1/mcp"
-       },
-       "github-apigee": {
-         "url": "https://YOUR_APIGEE_HOST/github-mcp/mcp/"
-       }
-     }
-   }
-   ```
-2. Save the file and complete the browser authentication prompt.
+Create or edit `mcp.json` (`.cursor/mcp.json` or `~/.cursor/mcp.json`):
+```json
+{
+  "mcpServers": {
+    "atlassian-apigee": {
+      "url": "https://YOUR_APIGEE_HOST/atlassian-mcp/v1/mcp"
+    },
+    "github-apigee": {
+      "url": "https://YOUR_APIGEE_HOST/github-mcp/mcp/"
+    },
+    "bigquery-apigee": {
+      "url": "https://YOUR_APIGEE_HOST/bq-mcp/mcp"
+    }
+  }
+}
+```
 
 ### 2. **Claude Code (CLI)**
-1. Run:
-   ```bash
-   claude mcp add --transport http atlassian-apigee https://YOUR_APIGEE_HOST/atlassian-mcp/v1/mcp
-   claude mcp add --transport http github-apigee https://YOUR_APIGEE_HOST/github-mcp/mcp/
-   ```
-2. Run `claude mcp login atlassian-apigee` / `github-apigee` and complete browser authentication.
+```bash
+# Add endpoints
+claude mcp add --transport http atlassian-apigee https://YOUR_APIGEE_HOST/atlassian-mcp/v1/mcp
+claude mcp add --transport http github-apigee https://YOUR_APIGEE_HOST/github-mcp/mcp/
+claude mcp add --transport http bigquery-apigee https://YOUR_APIGEE_HOST/bq-mcp/mcp
+
+# Login / Authorize
+claude mcp login atlassian-apigee
+claude mcp login github-apigee
+claude mcp login bigquery-apigee
+```
 
 ---
 
@@ -198,4 +276,9 @@ apigeecli apis create bundle -n atlassian-mcp -f ./atlassian-mcp-proxy/apiproxy 
 ### Deploy GitHub MCP Proxy
 ```bash
 apigeecli apis create bundle -n github-mcp -f ./github-mcp-proxy/apiproxy -o <YOUR_ORG> -e <YOUR_ENV> --default-token --ovr --wait
+```
+
+### Deploy BigQuery MCP Proxy
+```bash
+apigeecli apis create bundle -n bq-mcp -f ./bq-mcp-proxy/apiproxy -o <YOUR_ORG> -e <YOUR_ENV> --default-token --ovr --wait
 ```
